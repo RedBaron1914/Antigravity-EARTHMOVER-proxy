@@ -1129,9 +1129,7 @@ export class GeminiApiClient {
 		
 		const includedCode = hasFunctionCall || fullGeneratedText.includes("```");
 
-		if (traceId && activeProjectId) {
-			this.sendFakeTelemetry(traceId, activeProjectId, firstLatency, totalLatency, includedCode, citationsCount);
-		}
+		// Telemetry explicitly removed to match official opt-out behavior
 	}
 
 	/**
