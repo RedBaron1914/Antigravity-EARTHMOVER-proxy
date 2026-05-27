@@ -1,0 +1,23 @@
+name = "antigravity-EARTHMOVER-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-27"
+
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENABLE_REAL_THINKING = "true"
+STREAM_THINKING_AS_CONTENT = "true"
+
+# [vars]
+
+
+# --- Local Development Configuration ---
+# This section configures local development with Docker and miniflare
+[dev]
+ip = "0.0.0.0"          # Bind to all interfaces for Docker access
+port = 8787             # Port for local development server
+# Note: --persist-to flag in Docker handles storage location
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
