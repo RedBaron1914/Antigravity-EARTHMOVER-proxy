@@ -54,7 +54,7 @@ npx wrangler secret put GEMINI_PROJECT_ID
 ## 🛠️ Usage in any frontend
 Configure your IDE to point to your new Cloudflare Worker URL.
 
-**Base URL:** `https://antigravity-proxy.<your-subdomain>.workers.dev/v1`  
+**Base URL:** `https://antigravity-earthmover-worker/.<your-subdomain>.workers.dev/v1`  
 **API Key:** `dummy-key` *(Can be anything, the worker handles actual auth)*  
 
 The proxy will dynamically populate your model dropdown with the actual display names (e.g., `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Select one and start coding!
@@ -116,7 +116,7 @@ npx wrangler secret put GCP_SERVICE_ACCOUNT
 ## 🛠️ Использование
 
 Впишите эти данные в вашу фронтэнд клиент:
-**Base URL:** `https://antigravity-proxy.<ваш-субдомен>.workers.dev/v1`  
+**Base URL:** `https://antigravity-earthmover-worker/.<your-subdomain>.workers.dev/v1` 
 **API Key:** `dummy-key` *(Можно писать что угодно, авторизацию берет на себя прокси)*  
 
 Прокси автоматически загрузит список актуальных моделей с их красивыми названиями (например, `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Выбирайте любую и наслаждайтесь!
