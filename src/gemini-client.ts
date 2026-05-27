@@ -573,7 +573,10 @@ export class GeminiApiClient {
 						finalModelId = key;
 						if ((value as any).model) finalModelEnum = (value as any).model;
 						if ((value as any).thinkingBudget) customThinkingBudget = (value as any).thinkingBudget;
-						break;
+						// Skip deprecated models like M37 and keep looking for the active one (M16)
+						if (finalModelEnum !== "MODEL_PLACEHOLDER_M37") {
+							break;
+						}
 					}
 				}
 			}
@@ -617,6 +620,9 @@ export class GeminiApiClient {
 			}
 		};
 
+		const conversationId = crypto.randomUUID();
+		const trajectoryId = crypto.randomUUID();
+
 		const streamRequest: {
 			model: string;
 			project?: string;
@@ -636,7 +642,7 @@ export class GeminiApiClient {
 		} = {
 			model: finalModelId,
 			userAgent: "antigravity",
-			requestId: `agent/${crypto.randomUUID()}/${Date.now()}/${crypto.randomUUID()}/2`,
+			requestId: `agent/${conversationId}/${Date.now()}/${trajectoryId}/2`,
 			requestType: "agent",
 			request: {
 				contents: contents,
@@ -644,7 +650,7 @@ export class GeminiApiClient {
 				labels: {
 					"last_step_index": "1",
 					"model_enum": finalModelEnum,
-					"trajectory_id": crypto.randomUUID(),
+					"trajectory_id": trajectoryId,
 					"used_claude": finalModelId.includes("claude") ? "true" : "false",
 					"used_claude_conservative": "false"
 				},
@@ -665,6 +671,10 @@ export class GeminiApiClient {
 
 		if (projectId) {
 			streamRequest.project = projectId;
+		} else {
+			// Force the default shadow project if missing, because Pro models with projectRestrictions 
+			// will silently close the 200 OK stream if the project is omitted.
+			streamRequest.project = "carbon-reporter-5sf6z";
 		}
 
 		if (systemPrompt) {
@@ -1105,6 +1115,12 @@ export class GeminiApiClient {
 						};
 					}
 					// Note: Skipping unknown part structures
+				}
+			} else if ((candidate as any)?.finishReason) {
+				const finishReason = (candidate as any).finishReason;
+				// If we get a finish reason but no content, output it so the user isn't left with an empty 200 OK
+				if (finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+					yield { type: "text", data: `\n\n[Google API blocked this response. Finish Reason: ${finishReason}]` };
 				}
 			}
 
