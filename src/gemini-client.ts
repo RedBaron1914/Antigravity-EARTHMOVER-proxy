@@ -840,7 +840,7 @@ export class GeminiApiClient {
 			}
 
 			// Handle rate limiting with auto model switching
-			if (this.autoSwitchHelper.isRateLimitStatus(response.status) && !isRetry && originalModel) {
+			if (this.autoSwitchHelper.isRateLimitStatus(response.status) && originalModel) {
 				// Parse the error to see if it's a hard quota exhaustion
 				let isQuotaExhausted = false;
 				let quotaResetDelaySeconds = 300; // default 5 mins
@@ -874,12 +874,20 @@ export class GeminiApiClient {
 				}
 
 				if (isQuotaExhausted) {
+					if (isRetry) {
+						// If we already hot-swapped and the new account is ALSO exhausted, the pool is dead.
+						console.error(`[GeminiAPI] FATAL: All accounts in pool exhausted for ${originalModel}.`);
+						throw new Error(`429 - [EARTHMOVER FATAL] ALL accounts in your pool have exhausted their quotas for this model! Please add more burner accounts using 'node scripts/add-account.js' or wait for the reset.`);
+					}
+
 					console.log(`[GeminiAPI] QUOTA EXHAUSTED for model ${originalModel}. Reset in ${quotaResetDelaySeconds}s.`);
 					// Tell AuthManager to ban this account for this provider
 					await this.authManager.markAccountExhausted(originalModel, quotaResetDelaySeconds);
 					
 					// Hot-swap retry: call initializeAuth again to pick a new account, then retry
-					console.log(`[GeminiAPI] Hot-swapping to a new account from the pool...`);
+					// This happens silently without injecting text into the user's chat.
+					console.log(`[GeminiAPI] Hot-swapping to a new account from the pool silently...`);
+
 					await this.authManager.initializeAuth(originalModel);
 					
 					yield* this.performStreamRequest(
@@ -897,7 +905,7 @@ export class GeminiApiClient {
 
 				// If not a hard quota exhaustion, attempt auto model switching
 				const fallbackModel = this.autoSwitchHelper.getFallbackModel(originalModel);
-				if (fallbackModel && this.autoSwitchHelper.isEnabled()) {
+				if (fallbackModel && this.autoSwitchHelper.isEnabled() && !isRetry) {
 					console.log(
 						`Got ${response.status} error for model ${originalModel}, switching to fallback model: ${fallbackModel}`
 					);

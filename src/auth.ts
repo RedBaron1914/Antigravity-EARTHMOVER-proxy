@@ -36,7 +36,7 @@ export class AuthManager {
 
 	/**
 	 * Find an available account from the KV pool that isn't currently rate-limited for the requested provider.
-	 * If no KV pool is configured, falls back to the legacy single-account mode from GCP_SERVICE_ACCOUNT.
+	 * Implements Randomized Round-Robin with Priority routing.
 	 */
 	public async getAvailableAccount(modelId: string): Promise<string> {
 		const provider = this.getProviderForModel(modelId);
@@ -45,30 +45,39 @@ export class AuthManager {
 		if (this.env.ACCOUNTS_KV) {
 			try {
 				const keys = await this.env.ACCOUNTS_KV.list();
-				let selectedAccountId: string | null = null;
+				const healthyAccountsByPriority = new Map<number, string[]>();
 				let fallbackAccountId: string | null = null;
 
 				for (const key of keys.keys) {
 					const accountData = await this.env.ACCOUNTS_KV.get<AccountData>(key.name, "json");
 					if (!accountData || accountData.is_invalid) continue;
 
-					// Just keep track of the first valid looking account as a fallback
 					if (!fallbackAccountId) {
 						fallbackAccountId = key.name;
 					}
 
-					// Check if this account is exhausted for the requested provider
 					const exhaustedUntil = provider === "gemini" ? accountData.exhausted_gemini_until : accountData.exhausted_partner_until;
 
 					if (!exhaustedUntil || exhaustedUntil < now) {
-						// This account is healthy for this provider!
-						selectedAccountId = key.name;
-						break;
+						// Healthy account! Group it by priority (defaulting to 100)
+						const priority = accountData.priority !== undefined ? accountData.priority : 100;
+						if (!healthyAccountsByPriority.has(priority)) {
+							healthyAccountsByPriority.set(priority, []);
+						}
+						healthyAccountsByPriority.get(priority)!.push(key.name);
 					}
 				}
 
-				if (selectedAccountId) {
-					console.log(`[MultiAuth] Selected healthy account: ${selectedAccountId} for provider ${provider}`);
+				if (healthyAccountsByPriority.size > 0) {
+					// Find the group with the lowest priority number (e.g., 1 goes before 100)
+					const priorities = Array.from(healthyAccountsByPriority.keys()).sort((a, b) => a - b);
+					const lowestPriority = priorities[0];
+					const bestAccounts = healthyAccountsByPriority.get(lowestPriority)!;
+					
+					// Randomly select one account from the best priority group to distribute load (Serverless Round Robin)
+					const selectedAccountId = bestAccounts[Math.floor(Math.random() * bestAccounts.length)];
+					
+					console.log(`[MultiAuth] Selected healthy account: ${selectedAccountId} (Priority: ${lowestPriority}) for provider ${provider}`);
 					return selectedAccountId;
 				}
 

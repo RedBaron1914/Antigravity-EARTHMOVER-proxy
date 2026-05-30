@@ -48,6 +48,7 @@ export interface AccountData {
 	exhausted_gemini_until?: number; // Unix timestamp
 	exhausted_partner_until?: number; // Unix timestamp
 	is_invalid?: boolean;
+	priority?: number; // Lower number = higher priority. e.g., 1 for free, 100 for paid
 }
 
 // --- OAuth2 Credentials Interface ---

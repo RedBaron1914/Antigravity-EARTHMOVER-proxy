@@ -86,46 +86,51 @@ async function addAccount() {
 
             const tokenData = await tokenResponse.json();
             
-            const accountJson = JSON.stringify({
-                access_token: tokenData.access_token,
-                refresh_token: tokenData.refresh_token,
-                scope: tokenData.scope,
-                token_type: tokenData.token_type,
-                id_token: tokenData.id_token,
-                expiry_date: Date.now() + (tokenData.expires_in * 1000)
-            });
+            rl.question('\n5. Enter priority for this account (1 = highest, 100 = fallback/paid). Default is 1: ', async (priorityInput) => {
+                const priority = parseInt(priorityInput.trim()) || 1;
 
-            rl.question('\n5. Enter a unique name for this account (e.g., acc_1): ', async (accName) => {
-                const name = accName.trim() || `acc_${Math.floor(Math.random() * 10000)}`;
-                
-                console.log(`\nUploading account '${name}' to Cloudflare KV...`);
-                
-                try {
-                    const tempFilePath = path.join(process.cwd(), `temp-account-${name}.json`);
-                    await fs.writeFile(tempFilePath, accountJson, 'utf8');
+                const accountJson = JSON.stringify({
+                    access_token: tokenData.access_token,
+                    refresh_token: tokenData.refresh_token,
+                    scope: tokenData.scope,
+                    token_type: tokenData.token_type,
+                    id_token: tokenData.id_token,
+                    expiry_date: Date.now() + (tokenData.expires_in * 1000),
+                    priority: priority
+                });
 
-                    const cmd = `npx wrangler kv key put --binding=ACCOUNTS_KV "${name}" --path="${tempFilePath}"`;
+                rl.question('\n6. Enter a unique name for this account (e.g., acc_1): ', async (accName) => {
+                    const name = accName.trim() || `acc_${Math.floor(Math.random() * 10000)}`;
+                    
+                    console.log(`\nUploading account '${name}' (Priority: ${priority}) to Cloudflare KV...`);
+                    
+                    try {
+                        const tempFilePath = path.join(process.cwd(), `temp-account-${name}.json`);
+                        await fs.writeFile(tempFilePath, accountJson, 'utf8');
+
+                        const cmd = `npx wrangler kv key put --binding=ACCOUNTS_KV "${name}" --path="${tempFilePath}"`;
+                            
+                        const { stdout, stderr } = await execAsync(cmd);
                         
-                    const { stdout, stderr } = await execAsync(cmd);
-                    
-                    if (stderr && !stderr.includes("wrangler")) {
-                        console.warn(stderr);
+                        if (stderr && !stderr.includes("wrangler")) {
+                            console.warn(stderr);
+                        }
+
+                        // Clean up the temp file
+                        await fs.unlink(tempFilePath).catch(() => {});
+
+                        console.log(`\n✅ SUCCESS! Account '${name}' was added to your Multi-Account Pool with priority ${priority}!`);
+                        console.log("You can verify it by running: npx wrangler kv:key list --binding=ACCOUNTS_KV");
+                        
+                    } catch (cmdError) {
+                        console.error("\n❌ Failed to upload to KV:", cmdError.message);
+                        console.log("\nYou can manually add it by going to dash.cloudflare.com -> KV -> Add Entry");
+                        console.log(`Key: ${name}`);
+                        console.log(`Value: ${accountJson}`);
+                    } finally {
+                        rl.close();
                     }
-
-                    // Clean up the temp file
-                    await fs.unlink(tempFilePath).catch(() => {});
-
-                    console.log(`\n✅ SUCCESS! Account '${name}' was added to your Multi-Account Pool!`);
-                    console.log("You can verify it by running: npx wrangler kv:key list --binding=ACCOUNTS_KV");
-                    
-                } catch (cmdError) {
-                    console.error("\n❌ Failed to upload to KV:", cmdError.message);
-                    console.log("\nYou can manually add it by going to dash.cloudflare.com -> KV -> Add Entry");
-                    console.log(`Key: ${name}`);
-                    console.log(`Value: ${accountJson}`);
-                } finally {
-                    rl.close();
-                }
+                });
             });
 
         } catch (e) {
