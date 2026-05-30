@@ -108,7 +108,7 @@ async function addAccount() {
                         const tempFilePath = path.join(process.cwd(), `temp-account-${name}.json`);
                         await fs.writeFile(tempFilePath, accountJson, 'utf8');
 
-                        const cmd = `npx wrangler kv key put --binding=ACCOUNTS_KV "${name}" --path="${tempFilePath}"`;
+                        const cmd = `npx wrangler kv key put --binding=ACCOUNTS_KV "${name}" --path="${tempFilePath}" --remote`;
                             
                         const { stdout, stderr } = await execAsync(cmd);
                         
