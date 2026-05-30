@@ -7,8 +7,17 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ENABLE_REAL_THINKING = "true"
 STREAM_THINKING_AS_CONTENT = "true"
+# GEMINI_SAFETY_THRESHOLD = "BLOCK_NONE"
 
-# [vars]
+# --- Cloudflare KV Databases ---
+# Create these in your Cloudflare Dashboard and paste the IDs below to enable caching and Multi-Account pooling
+# [[kv_namespaces]]
+# binding = "GEMINI_CLI_KV"
+# id = "YOUR_CACHE_KV_ID_HERE"
+
+# [[kv_namespaces]]
+# binding = "ACCOUNTS_KV"
+# id = "YOUR_ACCOUNTS_KV_ID_HERE"
 
 
 # --- Local Development Configuration ---

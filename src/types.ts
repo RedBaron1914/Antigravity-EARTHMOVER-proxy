@@ -14,6 +14,8 @@ export interface Env {
 	GCP_SERVICE_ACCOUNT: string; // Now contains OAuth2 credentials JSON
 	GEMINI_PROJECT_ID?: string;
 	GEMINI_CLI_KV: KVNamespace; // Cloudflare KV for token caching
+	ACCOUNTS_KV?: KVNamespace; // Cloudflare KV for multi-account pool
+
 	OPENAI_API_KEY?: string; // Optional API key for authentication
 	ENABLE_FAKE_THINKING?: string; // Optional flag to enable fake thinking output (set to "true" to enable)
 	ENABLE_REAL_THINKING?: string; // Optional flag to enable real Gemini thinking output (set to "true" to enable)
@@ -36,6 +38,16 @@ export interface Env {
 	ENABLE_INLINE_CITATIONS?: string; // Enable inline citations in responses (default: false)
 	INCLUDE_GROUNDING_METADATA?: string; // Include grounding metadata in responses (default: true)
 	INCLUDE_SEARCH_ENTRY_POINT?: string; // Include search entry point HTML (default: false)
+}
+
+// --- Multi-Account Pool Interface ---
+export interface AccountData {
+	refresh_token: string;
+	access_token?: string;
+	expiry_date?: number;
+	exhausted_gemini_until?: number; // Unix timestamp
+	exhausted_partner_until?: number; // Unix timestamp
+	is_invalid?: boolean;
 }
 
 // --- OAuth2 Credentials Interface ---

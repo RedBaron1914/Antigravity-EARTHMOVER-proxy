@@ -516,7 +516,7 @@ export class GeminiApiClient {
 			showReasoning?: boolean;
 		} & NativeToolsRequestParams
 	): AsyncGenerator<StreamChunk> {
-		await this.authManager.initializeAuth();
+		await this.authManager.initializeAuth(modelId);
 		await this.fetchDynamicModels();
 		const projectId = await this.discoverProjectId();
 
@@ -841,6 +841,61 @@ export class GeminiApiClient {
 
 			// Handle rate limiting with auto model switching
 			if (this.autoSwitchHelper.isRateLimitStatus(response.status) && !isRetry && originalModel) {
+				// Parse the error to see if it's a hard quota exhaustion
+				let isQuotaExhausted = false;
+				let quotaResetDelaySeconds = 300; // default 5 mins
+
+				try {
+					const errorJson = JSON.parse(errorText);
+					const details = errorJson?.error?.details || [];
+					for (const detail of details) {
+						if (detail.reason === "QUOTA_EXHAUSTED") {
+							isQuotaExhausted = true;
+							if (detail.metadata?.quotaResetDelay) {
+								// e.g., "157h14m28.152758s"
+								const delayStr = detail.metadata.quotaResetDelay;
+								let totalSeconds = 0;
+								
+								const hoursMatch = delayStr.match(/(\d+)h/);
+								const minutesMatch = delayStr.match(/(\d+)m/);
+								const secondsMatch = delayStr.match(/([\d.]+)s/);
+								
+								if (hoursMatch) totalSeconds += parseInt(hoursMatch[1]) * 3600;
+								if (minutesMatch) totalSeconds += parseInt(minutesMatch[1]) * 60;
+								if (secondsMatch) totalSeconds += parseFloat(secondsMatch[1]);
+								
+								if (totalSeconds > 0) quotaResetDelaySeconds = totalSeconds;
+							}
+							break;
+						}
+					}
+				} catch (e) {
+					// Fallback if parsing fails
+				}
+
+				if (isQuotaExhausted) {
+					console.log(`[GeminiAPI] QUOTA EXHAUSTED for model ${originalModel}. Reset in ${quotaResetDelaySeconds}s.`);
+					// Tell AuthManager to ban this account for this provider
+					await this.authManager.markAccountExhausted(originalModel, quotaResetDelaySeconds);
+					
+					// Hot-swap retry: call initializeAuth again to pick a new account, then retry
+					console.log(`[GeminiAPI] Hot-swapping to a new account from the pool...`);
+					await this.authManager.initializeAuth(originalModel);
+					
+					yield* this.performStreamRequest(
+						streamRequest,
+						needsThinkingClose,
+						true, // count as retry so we don't infinitely loop on 401s
+						realThinkingAsContent,
+						showReasoning,
+						originalModel,
+						nativeToolsManager,
+						retryCount
+					);
+					return;
+				}
+
+				// If not a hard quota exhaustion, attempt auto model switching
 				const fallbackModel = this.autoSwitchHelper.getFallbackModel(originalModel);
 				if (fallbackModel && this.autoSwitchHelper.isEnabled()) {
 					console.log(
