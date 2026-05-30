@@ -15,9 +15,9 @@ STREAM_THINKING_AS_CONTENT = "true"
 # binding = "GEMINI_CLI_KV"
 # id = "YOUR_CACHE_KV_ID_HERE"
 
-# [[kv_namespaces]]
-# binding = "ACCOUNTS_KV"
-# id = "YOUR_ACCOUNTS_KV_ID_HERE"
+[[kv_namespaces]]
+binding = "ACCOUNTS_KV"
+id = "29023f2c821a4ea18c1f8c18b70f6eac"
 
 
 # --- Local Development Configuration ---

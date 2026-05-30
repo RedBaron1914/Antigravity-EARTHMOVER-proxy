@@ -2,6 +2,8 @@ import * as crypto from 'crypto';
 import * as readline from 'readline';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 const execAsync = promisify(exec);
 
@@ -99,20 +101,20 @@ async function addAccount() {
                 console.log(`\nUploading account '${name}' to Cloudflare KV...`);
                 
                 try {
-                    // Escape JSON for Windows PowerShell and Unix bash
-                    const escapedJson = process.platform === 'win32' 
-                        ? accountJson.replace(/"/g, '\\"') 
-                        : accountJson;
-                    
-                    const cmd = process.platform === 'win32'
-                        ? `npx wrangler kv:key put --binding=ACCOUNTS_KV "${name}" "${escapedJson}"`
-                        : `npx wrangler kv:key put --binding=ACCOUNTS_KV "${name}" '${escapedJson}'`;
+                    const tempFilePath = path.join(process.cwd(), `temp-account-${name}.json`);
+                    await fs.writeFile(tempFilePath, accountJson, 'utf8');
+
+                    const cmd = `npx wrangler kv key put --binding=ACCOUNTS_KV "${name}" --path="${tempFilePath}"`;
                         
                     const { stdout, stderr } = await execAsync(cmd);
                     
                     if (stderr && !stderr.includes("wrangler")) {
                         console.warn(stderr);
                     }
+
+                    // Clean up the temp file
+                    await fs.unlink(tempFilePath).catch(() => {});
+
                     console.log(`\n✅ SUCCESS! Account '${name}' was added to your Multi-Account Pool!`);
                     console.log("You can verify it by running: npx wrangler kv:key list --binding=ACCOUNTS_KV");
                     
