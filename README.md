@@ -71,11 +71,11 @@ Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+
 2. **Bind it in `wrangler.toml`:**
    Uncomment the `[[kv_namespaces]]` block at the bottom of your `wrangler.toml` and paste the `id` you got from Step 1.
 3. **Add Accounts to the Pool:**
-   Run `node scripts/login.js` multiple times with different burner Google accounts.
-   For each JSON block you receive, add it to the KV database using a unique key (e.g., `acc_1`, `acc_2`):
+   We've included an automated script that handles OAuth and injects the credentials directly into your KV database. Run this script for each burner account you want to add:
    ```bash
-   npx wrangler kv:key put --binding=ACCOUNTS_KV "acc_1" '{"access_token":"...","refresh_token":"..."}'
+   node scripts/add-account.js
    ```
+   Follow the prompts to authorize and name your account.
 4. **Deploy:** `npx wrangler deploy`. The proxy will now intelligently balance requests across all loaded accounts!
 
 ---
@@ -152,11 +152,11 @@ Google жестко ограничивает использование Claude O
 2. **Привяжите её в `wrangler.toml`:**
    Раскомментируйте блок `[[kv_namespaces]]` в самом низу вашего файла `wrangler.toml` и вставьте туда `id`, который вы получили на 1 шаге.
 3. **Добавьте аккаунты в пул:**
-   Запустите `node scripts/login.js` несколько раз с разными "выкидными" Google-аккаунтами.
-   Каждый полученный JSON-блок добавьте в базу KV под уникальным ключом (например, `acc_1`, `acc_2`):
+   Мы написали автоматический скрипт, который сам проведет вас через авторизацию и загрузит ключи напрямую в базу KV. Запустите его для каждого "выкидного" аккаунта, который хотите добавить:
    ```bash
-   npx wrangler kv:key put --binding=ACCOUNTS_KV "acc_1" '{"access_token":"...","refresh_token":"..."}'
+   node scripts/add-account.js
    ```
+   Следуйте инструкциям в терминале, чтобы авторизоваться и задать имя аккаунту.
 4. **Задеплойте:** `npx wrangler deploy`. Теперь прокси будет умно балансировать ваши запросы между всеми загруженными аккаунтами!
 
 ---
