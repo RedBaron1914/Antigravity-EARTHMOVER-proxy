@@ -175,8 +175,10 @@ export class AuthManager {
 
 		let cachedTokenData = null;
 		try {
-			const cachedToken = await this.env.GEMINI_CLI_KV.get(KV_TOKEN_KEY, "json");
-			if (cachedToken) cachedTokenData = cachedToken as any;
+			if (this.env.ACCOUNTS_KV) {
+				const cachedToken = await this.env.ACCOUNTS_KV.get(KV_TOKEN_KEY, "json");
+				if (cachedToken) cachedTokenData = cachedToken as any;
+			}
 		} catch (e) { /* ignore */ }
 
 		if (cachedTokenData) {
@@ -219,11 +221,13 @@ export class AuthManager {
 
 	private async cacheLegacyTokenInKV(accessToken: string, expiryDate: number): Promise<void> {
 		try {
-			const ttlSeconds = Math.floor((expiryDate - Date.now()) / 1000) - 300;
-			if (ttlSeconds >= 60) {
-				await this.env.GEMINI_CLI_KV.put(KV_TOKEN_KEY, JSON.stringify({ access_token: accessToken, expiry_date: expiryDate }), {
-					expirationTtl: ttlSeconds
-				});
+			if (this.env.ACCOUNTS_KV) {
+				const ttlSeconds = Math.floor((expiryDate - Date.now()) / 1000) - 300;
+				if (ttlSeconds >= 60) {
+					await this.env.ACCOUNTS_KV.put(KV_TOKEN_KEY, JSON.stringify({ access_token: accessToken, expiry_date: expiryDate }), {
+						expirationTtl: ttlSeconds
+					});
+				}
 			}
 		} catch (e) { /* ignore */ }
 	}
@@ -267,7 +271,9 @@ export class AuthManager {
 					await this.env.ACCOUNTS_KV.put(this.currentAccountId, JSON.stringify(accountData));
 				}
 			} else {
-				await this.env.GEMINI_CLI_KV.delete(KV_TOKEN_KEY);
+				if (this.env.ACCOUNTS_KV) {
+					await this.env.ACCOUNTS_KV.delete(KV_TOKEN_KEY);
+				}
 			}
 		} catch (e) { /* ignore */ }
 	}
