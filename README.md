@@ -14,35 +14,50 @@ Unlike other community proxies that require you to keep the heavy Antigravity de
 - 🔄 **Autonomous Auth:** Automatically exchanges and refreshes tokens using the official Antigravity Client ID & Secret.
 - 🛡️ **Abuse Protection:** Strips out Clearcut telemetry tracking while maintaining a valid request structure.
 - 📡 **Dynamic Routing:** Automatically discovers and routes models directly from Google's `fetchAvailableModels` internal dictionary.
-- 🔌 **IDE Ready:** Drop-in replacement for OpenAI API in Zed, Cursor, or any other IDE.
+- 🔌 **IDE Ready:** Drop-in replacement for OpenAI API in Zed, Cursor, or any other frontend.
 
 ---
 
-## ⚡ Quick Start
+## ⚡ Quick Start (For Beginners)
 
-### 1. Get Your Token
-You do not need to install the official Antigravity client. We have included an automated script that mimics the OAuth flow.
+Even if you have never opened a terminal before, just follow these simple steps!
 
+### Step 0: Prerequisites
+1. Download and install [Node.js](https://nodejs.org/) (LTS version).
+2. Create a free account on [Cloudflare](https://dash.cloudflare.com/sign-up).
+3. Download this repository (Click the green `Code` button -> `Download ZIP`) and extract it to a folder.
+4. Open your computer's Terminal (Command Prompt / PowerShell on Windows, Terminal on Mac) and navigate to that folder:
+   ```bash
+   cd path/to/extracted/folder
+   ```
+
+### Step 1: Install Dependencies & Login
+Install the required tools and link your Cloudflare account to your terminal:
 ```bash
 npm install
+npx wrangler login
+```
+*(A browser window will open asking you to authorize Cloudflare. Click "Allow".)*
+
+### Step 2: Get Your Google Token
+You do not need to install the official Antigravity client. We have included an automated script that mimics the OAuth flow.
+```bash
 node scripts/login.js
 ```
-Follow the instructions in the terminal. The script will output a JSON block. Copy this JSON.
+Follow the instructions in the terminal. The script will output a massive JSON block at the end. Copy this entire JSON block.
 
-### 2. Deploy to Cloudflare
-Deploy the worker to your Cloudflare account:
-
+### Step 3: Deploy the Proxy
+Upload the code to your Cloudflare account:
 ```bash
 npx wrangler deploy
 ```
 
-### 3. Inject the Secret
-Bind your OAuth token to the deployed worker:
-
+### Step 4: Inject the Secret
+Bind your Google OAuth token to the deployed worker securely:
 ```bash
 npx wrangler secret put GCP_SERVICE_ACCOUNT
 ```
-*Paste the JSON block you copied from Step 1 when prompted.*
+*Paste the JSON block you copied from Step 2 when prompted and hit Enter.*
 
 *(Optional)* If you have a specific Google Cloud project with the Cloud AI Companion API enabled and you are ready to pay for billing, you can bypass the default free-tier shadow project by setting your own:
 ```bash
@@ -52,9 +67,11 @@ npx wrangler secret put GEMINI_PROJECT_ID
 ---
 
 ## 🛠️ Usage in any frontend
-Configure your IDE to point to your new Cloudflare Worker URL.
+Configure your IDE (like Zed or Cursor) or chat UI to point to your new Cloudflare Worker URL.
 
-**Base URL:** `https://antigravity-earthmover-worker/.<your-subdomain>.workers.dev/v1`  
+**Base URL:** `https://antigravity-earthmover-worker.<your-subdomain>.workers.dev/v1`  
+*(You can find your exact URL in the terminal output after running `npx wrangler deploy`)*
+
 **API Key:** `dummy-key` *(Can be anything, the worker handles actual auth)*  
 
 The proxy will dynamically populate your model dropdown with the actual display names (e.g., `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Select one and start coding!
@@ -64,23 +81,27 @@ The proxy will dynamically populate your model dropdown with the actual display 
 ## 🔁 Multi-Account Round-Robin (Bypass Quotas)
 Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+ hour quota bans on free-tier accounts). EARTHMOVER supports a **Multi-Account Hot-Swap Pool** using Cloudflare KV. If an account runs out of quota, the proxy instantly marks it exhausted and retries the exact same request with the next available account.
 
-1. **Create a KV Namespace:**
+1. **Create a KV Database:**
    ```bash
    npx wrangler kv:namespace create ACCOUNTS_KV
    ```
 2. **Bind it in `wrangler.toml`:**
-   Uncomment the `[[kv_namespaces]]` block at the bottom of your `wrangler.toml` and paste the `id` you got from Step 1.
+   Open the `wrangler.toml` file in a text editor. Look at the bottom of the file. Replace `YOUR_ACCOUNTS_KV_ID_HERE` with the `id` you got from Step 1.
 3. **Add Accounts to the Pool:**
    We've included an automated script that handles OAuth and injects the credentials directly into your KV database. Run this script for each burner account you want to add:
    ```bash
    node scripts/add-account.js
    ```
    Follow the prompts to authorize and name your account.
-4. **Deploy:** `npx wrangler deploy`. The proxy will now intelligently balance requests across all loaded accounts!
+4. **Deploy:** 
+   ```bash
+   npx wrangler deploy
+   ```
+   The proxy will now intelligently balance requests across all loaded accounts!
 
 ---
 
-*Disclaimer: This is an unofficial tool created for educational and research purposes. Use at your own risk. It relies on undocumented APIs. Google may rotate the client secret or change the API structure at any time wtihout warning. Consider burner accounts.*
+*Disclaimer: This is an unofficial tool created for educational and research purposes. Use at your own risk. It relies on undocumented APIs. Google may rotate the client secret or change the API structure at any time without warning. Consider burner accounts.*
 
 ---
 ---
@@ -96,46 +117,64 @@ Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+
 
 ## Особенности
 - ☁️ **Никаких серверов:** Задеплойте в Cloudflare и закройте терминал.
-- 🎭 **Идеальная маскировка:** Обходит ошибки 500/403 от Google, полностью копируя структуру HTTP-пакетов официального Go-демона (включая `ThinkingConfig`, `model_enum` и нужные метки).
+- 🎭 **Идеальная маскировка:** Обходит ошибки 500/403 от Google, полностью копируя структуру HTTP-пакетов официального Go-демона.
 - 🔄 **Автономная авторизация:** Самостоятельно обновляет токены через официальные Client ID и Secret от Antigravity.
 - 🛡️ **Защита от банов:** Полностью вырезает телеметрию (Clearcut), маскируясь под клиента, отказавшегося от слежки.
 - 📡 **Динамический роутинг:** Автоматически скачивает свежий список моделей напрямую с серверов Google и на лету подменяет их на нужные M-коды.
-- 🔌 **Готов к работе:** Идеально работает в Zed, Cursor и любых других фронтэндов.
+- 🔌 **Готов к работе:** Идеально работает в Zed, Cursor и любых других фронтэндах.
 
 ---
 
-## ⚡ Быстрый старт
+## ⚡ Быстрый старт (Для новичков)
 
-### 1. Получение токена
-Вам не нужно скачивать оригинальный клиент Antigravity. Мы написали скрипт, который сделает всё за вас:
+Даже если вы никогда в жизни не открывали консоль, просто следуйте этим шагам!
 
+### Шаг 0: Подготовка
+1. Скачайте и установите [Node.js](https://nodejs.org/) (версию LTS).
+2. Создайте бесплатный аккаунт на [Cloudflare](https://dash.cloudflare.com/sign-up).
+3. Скачайте этот код (Нажмите зеленую кнопку `Code` -> `Download ZIP`) и распакуйте папку.
+4. Откройте терминал (Командная строка / PowerShell на Windows) и перейдите в эту папку:
+   ```bash
+   cd путь/до/распакованной/папки
+   ```
+
+### Шаг 1: Установка и Логин
+Установите нужные библиотеки и свяжите терминал с вашим аккаунтом Cloudflare:
 ```bash
 npm install
+npx wrangler login
+```
+*(Откроется окно браузера. Нажмите "Allow" (Разрешить), чтобы авторизовать Cloudflare).*
+
+### Шаг 2: Получение токена Google
+Вам не нужно скачивать оригинальный клиент Antigravity. Мы написали скрипт, который сделает всё за вас:
+```bash
 node scripts/login.js
 ```
-Следуйте инструкциям в консоли. Скрипт выдаст вам блок JSON. Скопируйте его.
+Следуйте инструкциям в консоли. Скрипт выдаст вам огромный блок JSON. Скопируйте его целиком.
 
-### 2. Деплой в Cloudflare
-Отправьте воркер в свое облако:
-
+### Шаг 3: Деплой в Cloudflare
+Отправьте код прокси в свое облако:
 ```bash
 npx wrangler deploy
 ```
 
-### 3. Добавление секрета
-Привяжите ваш токен к запущенному воркеру:
-
+### Шаг 4: Добавление секрета
+Привяжите ваш токен Google к запущенному воркеру, чтобы он мог безопасно авторизовываться:
 ```bash
 npx wrangler secret put GCP_SERVICE_ACCOUNT
 ```
-*Вставьте скопированный JSON из первого шага.*
+*Вставьте скопированный JSON из Шага 2, когда консоль попросит об этом, и нажмите Enter.*
 
 ---
 
 ## 🛠️ Использование
 
-Впишите эти данные в вашу фронтэнд клиент:
-**Base URL:** `https://antigravity-earthmover-worker/.<your-subdomain>.workers.dev/v1` 
+Впишите эти данные в ваш фронтэнд клиент (например, Zed или Cursor):
+
+**Base URL:** `https://antigravity-earthmover-worker.<ваш-субдомен>.workers.dev/v1`  
+*(Свой точный адрес вы увидите в консоли после выполнения Шага 3)*
+
 **API Key:** `dummy-key` *(Можно писать что угодно, авторизацию берет на себя прокси)*  
 
 Прокси автоматически загрузит список актуальных моделей с их красивыми названиями (например, `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Выбирайте любую и наслаждайтесь!
@@ -150,14 +189,18 @@ Google жестко ограничивает использование Claude O
    npx wrangler kv:namespace create ACCOUNTS_KV
    ```
 2. **Привяжите её в `wrangler.toml`:**
-   Раскомментируйте блок `[[kv_namespaces]]` в самом низу вашего файла `wrangler.toml` и вставьте туда `id`, который вы получили на 1 шаге.
+   Откройте файл `wrangler.toml` в любом текстовом редакторе. Найдите в самом низу строку `id = "YOUR_ACCOUNTS_KV_ID_HERE"` и замените этот текст на `id`, который вам выдала команда на 1 шаге.
 3. **Добавьте аккаунты в пул:**
    Мы написали автоматический скрипт, который сам проведет вас через авторизацию и загрузит ключи напрямую в базу KV. Запустите его для каждого "выкидного" аккаунта, который хотите добавить:
    ```bash
    node scripts/add-account.js
    ```
    Следуйте инструкциям в терминале, чтобы авторизоваться и задать имя аккаунту.
-4. **Задеплойте:** `npx wrangler deploy`. Теперь прокси будет умно балансировать ваши запросы между всеми загруженными аккаунтами!
+4. **Задеплойте:** 
+   ```bash
+   npx wrangler deploy
+   ```
+   Теперь прокси будет умно балансировать ваши запросы между всеми загруженными аккаунтами!
 
 ---
 *Отказ от ответственности: Это неофициальный инструмент, созданный для образовательных и исследовательских целей. Используйте на свой страх и риск. Он использует недокументированные API. Google может в любое время без предупреждения изменить секрет клиента или структуру API. Рассмотрите использование выкидных аккаунтов.*
