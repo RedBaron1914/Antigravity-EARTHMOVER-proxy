@@ -61,6 +61,25 @@ The proxy will dynamically populate your model dropdown with the actual display 
 
 ---
 
+## 🔁 Multi-Account Round-Robin (Bypass Quotas)
+Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+ hour quota bans on free-tier accounts). EARTHMOVER supports a **Multi-Account Hot-Swap Pool** using Cloudflare KV. If an account runs out of quota, the proxy instantly marks it exhausted and retries the exact same request with the next available account.
+
+1. **Create a KV Namespace:**
+   ```bash
+   npx wrangler kv:namespace create ACCOUNTS_KV
+   ```
+2. **Bind it in `wrangler.toml`:**
+   Uncomment the `[[kv_namespaces]]` block at the bottom of your `wrangler.toml` and paste the `id` you got from Step 1.
+3. **Add Accounts to the Pool:**
+   Run `node scripts/login.js` multiple times with different burner Google accounts.
+   For each JSON block you receive, add it to the KV database using a unique key (e.g., `acc_1`, `acc_2`):
+   ```bash
+   npx wrangler kv:key put --binding=ACCOUNTS_KV "acc_1" '{"access_token":"...","refresh_token":"..."}'
+   ```
+4. **Deploy:** `npx wrangler deploy`. The proxy will now intelligently balance requests across all loaded accounts!
+
+---
+
 *Disclaimer: This is an unofficial tool created for educational and research purposes. Use at your own risk. It relies on undocumented APIs. Google may rotate the client secret or change the API structure at any time wtihout warning. Consider burner accounts.*
 
 ---
@@ -120,6 +139,25 @@ npx wrangler secret put GCP_SERVICE_ACCOUNT
 **API Key:** `dummy-key` *(Можно писать что угодно, авторизацию берет на себя прокси)*  
 
 Прокси автоматически загрузит список актуальных моделей с их красивыми названиями (например, `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Выбирайте любую и наслаждайтесь!
+
+---
+
+## 🔁 Мульти-Аккаунты и Балансировка (Обход Квот)
+Google жестко ограничивает использование Claude Opus и Gemini Pro (часто выдавая баны на 150+ часов для бесплатных аккаунтов). EARTHMOVER поддерживает **Пул Аккаунтов с Горячей Заменой** через Cloudflare KV. Если на одном из аккаунтов заканчивается квота, прокси моментально помечает его как "выжатый" и повторяет тот же самый запрос со следующего доступного аккаунта.
+
+1. **Создайте базу KV:**
+   ```bash
+   npx wrangler kv:namespace create ACCOUNTS_KV
+   ```
+2. **Привяжите её в `wrangler.toml`:**
+   Раскомментируйте блок `[[kv_namespaces]]` в самом низу вашего файла `wrangler.toml` и вставьте туда `id`, который вы получили на 1 шаге.
+3. **Добавьте аккаунты в пул:**
+   Запустите `node scripts/login.js` несколько раз с разными "выкидными" Google-аккаунтами.
+   Каждый полученный JSON-блок добавьте в базу KV под уникальным ключом (например, `acc_1`, `acc_2`):
+   ```bash
+   npx wrangler kv:key put --binding=ACCOUNTS_KV "acc_1" '{"access_token":"...","refresh_token":"..."}'
+   ```
+4. **Задеплойте:** `npx wrangler deploy`. Теперь прокси будет умно балансировать ваши запросы между всеми загруженными аккаунтами!
 
 ---
 *Отказ от ответственности: Это неофициальный инструмент, созданный для образовательных и исследовательских целей. Используйте на свой страх и риск. Он использует недокументированные API. Google может в любое время без предупреждения изменить секрет клиента или структуру API. Рассмотрите использование выкидных аккаунтов.*
