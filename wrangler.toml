@@ -12,9 +12,9 @@ STREAM_THINKING_AS_CONTENT = "true"
 # --- Cloudflare KV Databases ---
 # Create this in your Cloudflare Dashboard and paste the ID below to enable Multi-Account pooling and token caching
 
-[[kv_namespaces]]
-binding = "ACCOUNTS_KV"
-id = "29023f2c821a4ea18c1f8c18b70f6eac"
+#[[kv_namespaces]]
+#binding = "ACCOUNTS_KV"
+#id = "29023f2c821a4ea18c1f8c18b70f6eac"
 
 
 # --- Local Development Configuration ---
