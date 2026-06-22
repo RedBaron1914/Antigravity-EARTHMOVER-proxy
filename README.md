@@ -186,7 +186,7 @@ Google жестко ограничивает использование Claude O
 
 1. **Создайте базу KV:**
    ```bash
-   npx wrangler kv:namespace create ACCOUNTS_KV
+   npx wrangler kv namespace create ACCOUNTS_KV
    ```
 2. **Привяжите её в `wrangler.toml`:**
    Откройте файл `wrangler.toml` в любом текстовом редакторе. Найдите в самом низу строку `id = "YOUR_ACCOUNTS_KV_ID_HERE"` и замените этот текст на `id`, который вам выдала команда на 1 шаге.
