@@ -46,15 +46,24 @@ export interface GeminiPart {
 	text?: string;
 	thought?: boolean; // For real thinking chunks from Gemini
 	functionCall?: {
+		id?: string;
 		name: string;
 		args: object;
 	};
 	thoughtSignature?: string;
 	functionResponse?: {
+		id?: string;
 		name: string;
 		response: {
-			result: string;
+			result?: string;
+			output?: string;
 		};
+		parts?: Array<{
+			inlineData?: {
+				mimeType: string;
+				data: string;
+			};
+		}>;
 	};
 	inlineData?: {
 		mimeType: string;
@@ -127,7 +136,7 @@ export class GeminiApiClient {
 			if (response.ok) {
 				const data = await response.json() as any;
 				this.dynamicModelMap = data.models || {};
-				console.log(`[DynamicModels] Successfully loaded ${Object.keys(this.dynamicModelMap).length} models dynamically.`);
+				console.log(`[DynamicModels] Successfully loaded ${Object.keys(this.dynamicModelMap || {}).length} models dynamically.`);
 			} else {
 				console.warn(`[DynamicModels] Server rejected the request: HTTP ${response.status} - ${await response.text()}`);
 			}
@@ -308,7 +317,7 @@ export class GeminiApiClient {
 	/**
 	 * Converts a message to Gemini format, handling both text and image content.
 	 */
-	private async messageToGeminiFormat(msg: ChatMessage): Promise<GeminiFormattedMessage> {
+	private async messageToGeminiFormat(msg: ChatMessage): Promise<GeminiFormattedMessage | GeminiFormattedMessage[]> {
 		const role = msg.role === "assistant" ? "model" : "user";
 
 		// Handle tool call results (tool role in OpenAI format)
@@ -376,112 +385,123 @@ export class GeminiApiClient {
 		}
 
 		if (Array.isArray(msg.content)) {
-			// Multimodal message with text and/or images
-			const parts: GeminiPart[] = [];
+			// Multimodal message with text and/or images/media
+			const textParts: GeminiPart[] = [];
+			const mediaParts: { part: GeminiPart; filename: string }[] = [];
+			let mediaCount = 0;
 
 			for (const content of msg.content) {
 				if (content.type === "text") {
-					parts.push({ text: content.text });
+					textParts.push({ text: content.text });
 				} else if (content.type === "image_url" && content.image_url) {
+					mediaCount++;
 					const imageUrl = content.image_url.url;
 
-					// Validate image URL
 					const { isValid, error, mimeType } = validateContent("image_url", content);
-					if (!isValid) {
-						throw new Error(`Invalid image: ${error}`);
-					}
+					if (!isValid) throw new Error(`Invalid image: ${error}`);
 
 					if (imageUrl.startsWith("data:")) {
-						// Handle base64 encoded images
 						const [header, base64Data] = imageUrl.split(",");
-						if (!base64Data) {
-							throw new Error("Invalid base64 data URL: missing data part.");
-						}
-						const mimeType = header.split(":")[1].split(";")[0];
+						if (!base64Data) throw new Error("Invalid base64 data URL: missing data part.");
+						const finalMimeType = header.split(":")[1].split(";")[0] || mimeType || "image/jpeg";
+						const ext = finalMimeType.split("/")[1] || "jpg";
 
-						parts.push({
-							inlineData: {
-								mimeType: mimeType,
-								data: base64Data
-							}
+						mediaParts.push({
+							part: { inlineData: { mimeType: finalMimeType, data: base64Data } },
+							filename: `C:\\user_uploaded_image_${mediaCount}.${ext}`
 						});
 					} else {
-						// Handle URL images by fetching and converting to base64
-						console.log(`Fetching image from URL: ${imageUrl}`);
-						const imageResponse = await fetch(imageUrl);
-						if (!imageResponse.ok) {
-							throw new Error(`Failed to fetch image from URL: ${imageUrl}. Status: ${imageResponse.status}`);
-						}
-						const imageBuffer = await imageResponse.arrayBuffer();
-
-						// Efficiently convert ArrayBuffer to base64 in a worker environment
-						let binary = "";
-						const bytes = new Uint8Array(imageBuffer);
-						const len = bytes.byteLength;
-						for (let i = 0; i < len; i++) {
-							binary += String.fromCharCode(bytes[i]);
-						}
-						const base64Data = btoa(binary);
-
-						const fetchedMimeType = imageResponse.headers.get("Content-Type") || "image/jpeg";
-
-						parts.push({
-							inlineData: {
-								mimeType: fetchedMimeType,
-								data: base64Data
-							}
-						});
+						throw new Error("Only base64 image URLs are supported currently.");
 					}
 				} else if (content.type === "input_audio" && content.input_audio) {
-					parts.push({
-						inlineData: {
-							mimeType: content.input_audio.format,
-							data: content.input_audio.data
-						}
+					mediaCount++;
+					const ext = content.input_audio.format.split("/")[1] || "wav";
+					mediaParts.push({
+						part: { inlineData: { mimeType: content.input_audio.format, data: content.input_audio.data } },
+						filename: `C:\\user_uploaded_audio_${mediaCount}.${ext}`
 					});
 				} else if (content.type === "input_video" && content.input_video) {
 					if (content.input_video.data && content.input_video.format) {
-						// Handle base64 video
+						mediaCount++;
+						const ext = content.input_video.format.split("/")[1] || "mp4";
 						const part: GeminiPart = {
-							inlineData: {
-								mimeType: content.input_video.format,
-								data: content.input_video.data
-							}
+							inlineData: { mimeType: content.input_video.format, data: content.input_video.data }
 						};
 
-						// Add video metadata if present
 						if (content.input_video.videoMetadata) {
 							const { startOffset, endOffset, fps } = content.input_video.videoMetadata;
 							if (startOffset || endOffset || fps) {
 								part.videoMetadata = {};
-								// Pass strings directly as Gemini API accepts "10s" format
 								if (startOffset) part.videoMetadata.startOffset = startOffset;
 								if (endOffset) part.videoMetadata.endOffset = endOffset;
 								if (fps) part.videoMetadata.fps = fps;
 							}
 						}
-						parts.push(part);
+						mediaParts.push({ part, filename: `C:\\user_uploaded_video_${mediaCount}.${ext}` });
 					}
 				} else if (content.type === "input_pdf" && content.input_pdf) {
 					if (content.input_pdf.data) {
-						// Validate PDF
+						mediaCount++;
 						const { isValid, error } = validateContent("input_pdf", content);
-						if (!isValid) {
-							throw new Error(`Invalid PDF: ${error}`);
-						}
+						if (!isValid) throw new Error(`Invalid PDF: ${error}`);
 
-						// Handle base64 PDF
-						parts.push({
-							inlineData: {
-								mimeType: "application/pdf",
-								data: content.input_pdf.data
-							}
+						mediaParts.push({
+							part: { inlineData: { mimeType: "application/pdf", data: content.input_pdf.data } },
+							filename: `C:\\user_uploaded_document_${mediaCount}.pdf`
 						});
 					}
 				}
 			}
 
-			return { role, parts };
+			if (mediaParts.length > 0) {
+				const messages: GeminiFormattedMessage[] = [];
+				const toolIdBase = crypto.randomUUID().replace(/-/g, "").substring(0, 8);
+				
+				// 1. Dummy User message to satisfy the API rule that conversation must start with 'user'
+				messages.push({ role: "user", parts: [{ text: "I have uploaded some files. Please use your tools to view them." }] });
+				
+				// 2. Fake Assistant message with functionCall for each media file
+				messages.push({
+					role: "model",
+					parts: mediaParts.map((media, index) => ({
+						functionCall: {
+							id: `${toolIdBase}${index}`,
+							name: "view_file",
+							args: { 
+								AbsolutePath: media.filename,
+								toolAction: "Viewing uploaded file",
+								toolSummary: "File viewing"
+							}
+						},
+						thoughtSignature: ""
+					}))
+				});
+				
+				// 3. Fake User message with functionResponse AND actual user text
+				const combinedUserParts: GeminiPart[] = mediaParts.map((media, index) => ({
+					functionResponse: {
+						id: `${toolIdBase}${index}`,
+						name: "view_file",
+						response: { output: "The following is the entire, complete content of the requested file." },
+						parts: [media.part]
+					}
+				}));
+
+				if (textParts.length > 0) {
+					combinedUserParts.push(...textParts);
+				} else {
+					combinedUserParts.push({ text: "Please analyze the uploaded files." });
+				}
+
+				messages.push({
+					role: "user",
+					parts: combinedUserParts
+				});
+				
+				return messages;
+			}
+
+			return { role, parts: textParts };
 		}
 
 		// Fallback for unexpected content format
@@ -522,7 +542,9 @@ export class GeminiApiClient {
 
 		// Preprocess messages to handle parallel tool calls
 		const preprocessedMessages = this.preprocessMessages(messages);
-		const contents = await Promise.all(preprocessedMessages.map((msg) => this.messageToGeminiFormat(msg)));
+		const contentsPromises = preprocessedMessages.map((msg) => this.messageToGeminiFormat(msg));
+		const contentsArrays = await Promise.all(contentsPromises);
+		const contents = contentsArrays.flat();
 
 		// Check if this is a thinking model and which thinking mode to use
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
@@ -658,9 +680,37 @@ export class GeminiApiClient {
 			}
 		};
 
-		if (tools && (tools as any[]).length > 0) {
-			streamRequest.request.tools = tools;
-			streamRequest.request.toolConfig = finalToolConfig;
+		let finalTools = tools ? [...(tools as any[])] : [];
+		let resolvedToolConfig = finalToolConfig;
+
+		// If we gaslighted the model with view_file tool calls for images, we MUST declare the tool
+		const hasGaslightedTools = contents.some((msg: any) => 
+			msg.parts?.some((p: any) => p.functionCall?.name === "view_file" || p.functionResponse?.name === "view_file")
+		);
+
+		if (hasGaslightedTools) {
+			finalTools.push({
+				functionDeclarations: [
+					{
+						name: "view_file",
+						description: "View the contents of a file.",
+						parameters: {
+							type: "OBJECT",
+							properties: {
+								AbsolutePath: { type: "STRING" },
+								toolAction: { type: "STRING" },
+								toolSummary: { type: "STRING" }
+							}
+						}
+					}
+				]
+			});
+			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: "AUTO" } };
+		}
+
+		if (finalTools.length > 0) {
+			streamRequest.request.tools = finalTools;
+			streamRequest.request.toolConfig = resolvedToolConfig;
 		} else {
 			streamRequest.request.toolConfig = {
 				functionCallingConfig: {

@@ -57,8 +57,11 @@ app.use("/v1/*", async (c, next) => {
 // Apply OpenAI API key authentication middleware to all /v1 routes
 app.use("/v1/*", openAIApiKeyAuth);
 
+import { SdapiRoute } from "./routes/sdapi";
+
 // Setup route handlers
 app.route("/v1", OpenAIRoute);
+app.route("/sdapi", SdapiRoute);
 
 // Root endpoint - basic info about the service
 app.get("/", (c) => {

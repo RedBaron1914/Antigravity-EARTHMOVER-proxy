@@ -287,7 +287,8 @@ export class AuthManager {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${this.currentAccessToken}`
+				Authorization: `Bearer ${this.currentAccessToken}`,
+				"User-Agent": "antigravity/cli/1.0.2 windows/amd64"
 			},
 			body: JSON.stringify(body)
 		});

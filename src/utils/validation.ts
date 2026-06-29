@@ -11,7 +11,11 @@ import { validatePdfBase64 } from "./pdf-utils";
  * @returns True if the model supports the media type, false otherwise.
  */
 export function isMediaTypeSupported(modelId: string, supportKey: keyof ModelInfo): boolean {
-	return !!geminiCliModels[modelId]?.[supportKey];
+	if (modelId in geminiCliModels) {
+		return !!geminiCliModels[modelId]?.[supportKey];
+	}
+	// For dynamic/unknown models, we assume they support the media type
+	return true;
 }
 
 /**
@@ -21,12 +25,7 @@ export function isMediaTypeSupported(modelId: string, supportKey: keyof ModelInf
  * @returns An object with an `isValid` boolean and an optional `error` message.
  */
 export function validateModel(modelId: string): { isValid: boolean; error?: string } {
-	if (!(modelId in geminiCliModels)) {
-		return {
-			isValid: false,
-			error: `Model '${modelId}' not found. Available models: ${getAllModelIds().join(", ")}`
-		};
-	}
+	// For dynamic models, we bypass the strict model validation
 	return { isValid: true };
 }
 

@@ -10,33 +10,10 @@ export const DebugRoute = new Hono<{ Bindings: Env }>();
 
 // Check KV cache status
 DebugRoute.get("/cache", async (c) => {
-	try {
-		const authManager = new AuthManager(c.env);
-		const cacheInfo = await authManager.getCachedTokenInfo();
-
-		// Remove sensitive information from the response
-		const sanitizedInfo = {
-			status: "ok",
-			cached: cacheInfo.cached,
-			cached_at: cacheInfo.cached_at,
-			expires_at: cacheInfo.expires_at,
-			time_until_expiry_seconds: cacheInfo.time_until_expiry_seconds,
-			is_expired: cacheInfo.is_expired,
-			message: cacheInfo.message
-			// Explicitly exclude token_preview and any other sensitive data
-		};
-
-		return c.json(sanitizedInfo);
-	} catch (e: unknown) {
-		const errorMessage = e instanceof Error ? e.message : String(e);
-		return c.json(
-			{
-				status: "error",
-				message: errorMessage
-			},
-			500
-		);
-	}
+	return c.json({
+		status: "error",
+		message: "Not implemented in Multi-Account architecture"
+	}, 501);
 });
 
 // Simple token test endpoint
