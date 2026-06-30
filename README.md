@@ -15,6 +15,8 @@ Unlike other community proxies that require you to keep the heavy Antigravity de
 - 🛡️ **Abuse Protection:** Strips out Clearcut telemetry tracking while maintaining a valid request structure.
 - 📡 **Dynamic Routing:** Automatically discovers and routes models directly from Google's `fetchAvailableModels` internal dictionary.
 - 🔌 **IDE Ready:** Drop-in replacement for OpenAI API in Zed, Cursor, or any other frontend.
+- 👁️ **Full Multimodality:** Send Images, Audio, Video, and PDFs seamlessly. Bypasses internal restrictions using intelligent tool-call masking.
+- 🎨 **Image Generation (Nanobanano):** Built-in support for generating images via the standard SD WebUI API (`/sdapi/v1/txt2img`). Compatible with SillyTavern out-of-the-box.
 
 ---
 
@@ -78,6 +80,18 @@ The proxy will dynamically populate your model dropdown with the actual display 
 
 ---
 
+## 🎨 Image Generation (SD WebUI API)
+
+EARTHMOVER includes built-in support for image generation using Google's Gemini 3.1 Flash Image model via a standard SD WebUI compatible endpoint.
+
+To use this in clients like **SillyTavern**:
+1. Go to the Image Generation extension settings.
+2. Select **Stable Diffusion WebUI** as the provider.
+3. Set the API URL to: `https://antigravity-earthmover-worker.<your-subdomain>.workers.dev` (Do **not** add `/v1` at the end).
+4. Generate images using standard prompts! (Under the hood, it uses the nanobanano approach to seamlessly route requests to Gemini).
+
+---
+
 ## 🔁 Multi-Account Round-Robin (Bypass Quotas)
 Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+ hour quota bans on free-tier accounts). EARTHMOVER supports a **Multi-Account Hot-Swap Pool** using Cloudflare KV. If an account runs out of quota, the proxy instantly marks it exhausted and retries the exact same request with the next available account.
 
@@ -122,6 +136,8 @@ Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+
 - 🛡️ **Защита от банов:** Полностью вырезает телеметрию (Clearcut), маскируясь под клиента, отказавшегося от слежки.
 - 📡 **Динамический роутинг:** Автоматически скачивает свежий список моделей напрямую с серверов Google и на лету подменяет их на нужные M-коды.
 - 🔌 **Готов к работе:** Идеально работает в Zed, Cursor и любых других фронтэндах.
+- 👁️ **Полная мультимодальность:** Отправляйте картинки, аудио, видео и PDF. Умно обходит внутренние ограничения API с помощью маскировки под вызовы инструментов.
+- 🎨 **Генерация картинок (Nanobanano):** Встроенная поддержка генерации изображений через стандартный SD WebUI API (`/sdapi/v1/txt2img`). Идеально работает с SillyTavern из коробки.
 
 ---
 
@@ -178,6 +194,18 @@ npx wrangler secret put GCP_SERVICE_ACCOUNT
 **API Key:** `dummy-key` *(Можно писать что угодно, авторизацию берет на себя прокси)*  
 
 Прокси автоматически загрузит список актуальных моделей с их красивыми названиями (например, `Gemini 3.5 Flash (Medium)`, `Claude Opus 4.6 (Thinking)`). Выбирайте любую и наслаждайтесь!
+
+---
+
+## 🎨 Генерация изображений (SD WebUI API)
+
+В EARTHMOVER встроена поддержка генерации картинок через модель Gemini 3.1 Flash Image с использованием стандартного SD WebUI эндпоинта.
+
+Чтобы подключить это в клиентах вроде **SillyTavern**:
+1. Откройте настройки расширения Image Generation.
+2. Выберите провайдером **Stable Diffusion WebUI**.
+3. Укажите API URL: `https://antigravity-earthmover-worker.<ваш-субдомен>.workers.dev` (Строго **без** `/v1` на конце).
+4. Генерируйте картинки как обычно! (Под капотом используется подход nanobanano для прозрачного роутинга запросов в Gemini).
 
 ---
 
