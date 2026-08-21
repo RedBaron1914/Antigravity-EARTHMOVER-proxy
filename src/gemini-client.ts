@@ -546,6 +546,16 @@ export class GeminiApiClient {
 		const contentsArrays = await Promise.all(contentsPromises);
 		const contents = contentsArrays.flat();
 
+		// Gemini API strictly requires that conversations start and end with the 'user' role.
+		if (contents.length > 0) {
+			if (contents[0].role === "model") {
+				contents.unshift({ role: "user", parts: [{ text: "Begin conversation." }] });
+			}
+			if (contents[contents.length - 1].role === "model") {
+				contents.push({ role: "user", parts: [{ text: "Continue." }] });
+			}
+		}
+
 		// Check if this is a thinking model and which thinking mode to use
 		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
@@ -632,10 +642,8 @@ export class GeminiApiClient {
 			}
 		}
 
-		// Construct the final generation config strictly matching Antigravity
-		// Do NOT spread user options like temperature or topP, as v1internal strictly rejects them for agent endpoints.
 		const finalGenerationConfig = {
-			maxOutputTokens: 16384, // Value from the successful dump
+			maxOutputTokens: 65536, // Value from the successful dump
 			thinkingConfig: {
 				includeThoughts: true,
 				thinkingBudget: customThinkingBudget
@@ -672,9 +680,11 @@ export class GeminiApiClient {
 				labels: {
 					"last_step_index": "1",
 					"model_enum": finalModelEnum,
+					"request_id": `${trajectoryId}-0`,
 					"trajectory_id": trajectoryId,
 					"used_claude": finalModelId.includes("claude") ? "true" : "false",
-					"used_claude_conservative": "false"
+					"used_claude_conservative": "false",
+					"used_non_gemini_model": "false"
 				},
 				sessionId: String(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
 			}
@@ -705,7 +715,7 @@ export class GeminiApiClient {
 					}
 				]
 			});
-			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: "AUTO" } };
+			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: "VALIDATED" } };
 		}
 
 		if (finalTools.length > 0) {

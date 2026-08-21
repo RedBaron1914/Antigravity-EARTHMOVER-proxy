@@ -4,6 +4,8 @@
 
 > *"We came, we saw, we conquered - the triumph of the will"*
 
+💖 **Support the author:** [Boosty](https://boosty.to/redbaron1914)
+
 This is the ultimate, **100% serverless** Cloudflare Worker proxy that exposes an OpenAI-compatible API backed by the internal Antigravity Cloud Code endpoint. 
 
 Unlike other community proxies that require you to keep the heavy Antigravity desktop app running in the background to scrape SQLite databases, this proxy is **completely autonomous**. It handles its own OAuth token refreshes, dynamic model discovery, and payload manipulation directly in the cloud.
@@ -124,6 +126,8 @@ Google aggressively limits Claude Opus and Gemini Pro usage (often applying 150+
 # Antigravity EARTHMOVER Прокси 🚀
 
 > *"Пришли, увидели, победили - триумф воли"*
+
+💖 **Поддержать автора:** [Boosty](https://boosty.to/redbaron1914)
 
 Это ультимативный, **на 100% бессерверный** Cloudflare Worker прокси, который предоставляет OpenAI-совместимый API, работающий поверх скрытого внутреннего эндпоинта Antigravity Cloud Code.
 
