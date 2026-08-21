@@ -225,7 +225,7 @@ export class GenerationConfigValidator {
 			// Handle tool choice
 			if (options.tool_choice) {
 				if (options.tool_choice === "auto") {
-					toolConfig = { functionCallingConfig: { mode: "VALIDATED" } };
+					toolConfig = { functionCallingConfig: { mode: "AUTO" } };
 				} else if (options.tool_choice === "none") {
 					toolConfig = { functionCallingConfig: { mode: "NONE" } };
 				} else if (typeof options.tool_choice === "object" && options.tool_choice.function) {

@@ -642,8 +642,11 @@ export class GeminiApiClient {
 			}
 		}
 
+		const isNewModel = finalModelId.includes("3.6") || finalModelId.includes("3.7") || finalModelEnum === "MODEL_PLACEHOLDER_M73";
+		const maxTokens = isNewModel ? 65536 : 16384;
+
 		const finalGenerationConfig = {
-			maxOutputTokens: 65536, // Value from the successful dump
+			maxOutputTokens: maxTokens,
 			thinkingConfig: {
 				includeThoughts: true,
 				thinkingBudget: customThinkingBudget
@@ -715,7 +718,8 @@ export class GeminiApiClient {
 					}
 				]
 			});
-			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: "VALIDATED" } };
+			const defaultMode = isNewModel ? "VALIDATED" : "AUTO";
+			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: defaultMode } };
 		}
 
 		if (finalTools.length > 0) {
