@@ -473,7 +473,7 @@ export class GeminiApiClient {
 								toolSummary: "File viewing"
 							}
 						},
-						thoughtSignature: ""
+						thoughtSignature: "skip_thought_signature_validator"
 					}))
 				});
 				
@@ -702,35 +702,50 @@ export class GeminiApiClient {
 		);
 
 		if (hasGaslightedTools) {
-			finalTools.push({
-				functionDeclarations: [
-					{
-						name: "view_file",
-						description: "View the contents of a file.",
-						parameters: {
-							type: "OBJECT",
-							properties: {
-								AbsolutePath: { type: "STRING" },
-								toolAction: { type: "STRING" },
-								toolSummary: { type: "STRING" }
-							}
+			const viewFileDecl = {
+				name: "view_file",
+				description: "View the contents of a file from the local filesystem. This tool supports text files and following binary files: image, pdf, video, audio.",
+				parameters: {
+					type: "OBJECT",
+					properties: {
+						AbsolutePath: {
+							type: "STRING",
+							description: "Path to file to view. Must be an absolute path."
+						},
+						toolAction: {
+							type: "STRING",
+							description: "Brief 2-5 word summary of what this tool is doing. Capitalize like a sentence."
+						},
+						toolSummary: {
+							type: "STRING",
+							description: "Brief 2-5 word noun phrase describing what this tool call is about. Capitalize like a sentence."
 						}
-					}
-				]
-			});
-			const defaultMode = isNewModel ? "VALIDATED" : "AUTO";
-			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: defaultMode } };
+					},
+					required: [
+						"AbsolutePath",
+						"toolSummary",
+						"toolAction"
+					]
+				}
+			};
+
+			const existingFuncDeclObj = finalTools.find((t: any) => Array.isArray(t.functionDeclarations));
+			if (existingFuncDeclObj) {
+				if (!existingFuncDeclObj.functionDeclarations.some((f: any) => f.name === "view_file")) {
+					existingFuncDeclObj.functionDeclarations.push(viewFileDecl);
+				}
+			} else {
+				finalTools.push({ functionDeclarations: [viewFileDecl] });
+			}
+
+			resolvedToolConfig = resolvedToolConfig || { functionCallingConfig: { mode: "VALIDATED" } };
 		}
 
 		if (finalTools.length > 0) {
 			streamRequest.request.tools = finalTools;
-			streamRequest.request.toolConfig = resolvedToolConfig;
-		} else {
-			streamRequest.request.toolConfig = {
-				functionCallingConfig: {
-					mode: "NONE"
-				}
-			};
+			if (resolvedToolConfig) {
+				streamRequest.request.toolConfig = resolvedToolConfig;
+			}
 		}
 
 		if (projectId) {
