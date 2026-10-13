@@ -115,8 +115,8 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 		const model = body.model || DEFAULT_MODEL;
 
 		const messages = body.messages || [];
-		// OpenAI API compatibility: stream defaults to true unless explicitly set to false
-		const stream = body.stream !== false;
+		// OpenAI API compatibility: stream defaults to false unless explicitly set to true
+		const stream = body.stream === true;
 
 		// Extract system prompt and user/assistant messages first to allow for prompt-based commands
 		let fullSystemPrompt = "";
@@ -367,6 +367,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 							message: {
 								role: "assistant",
 								content: completion.content,
+								reasoning_content: completion.reasoning || undefined,
 								tool_calls: completion.tool_calls
 							},
 							finish_reason: completion.tool_calls && completion.tool_calls.length > 0 ? "tool_calls" : "stop"

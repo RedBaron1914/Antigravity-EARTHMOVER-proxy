@@ -194,6 +194,7 @@ export interface ChatCompletionChoice {
 export interface ChatCompletionMessage {
 	role: "assistant";
 	content: string | null;
+	reasoning_content?: string | null;
 	tool_calls?: ToolCall[];
 }
 

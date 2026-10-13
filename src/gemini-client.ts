@@ -1318,9 +1318,11 @@ export class GeminiApiClient {
 		content: string;
 		usage?: UsageData;
 		tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+		reasoning?: string;
 	}> {
 		try {
 			let content = "";
+			let reasoning = "";
 			let usage: UsageData | undefined;
 			const tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
 
@@ -1328,6 +1330,16 @@ export class GeminiApiClient {
 			for await (const chunk of this.streamContent(modelId, systemPrompt, messages, options)) {
 				if (chunk.type === "text" && typeof chunk.data === "string") {
 					content += chunk.data;
+				} else if (chunk.type === "thinking_content" && typeof chunk.data === "string") {
+					reasoning += chunk.data;
+				} else if (chunk.type === "real_thinking" && typeof chunk.data === "string") {
+					reasoning += chunk.data;
+				} else if (chunk.type === "reasoning") {
+					if (typeof chunk.data === "string") {
+						reasoning += chunk.data;
+					} else if (typeof chunk.data === "object" && chunk.data !== null && "reasoning" in chunk.data) {
+						reasoning += (chunk.data as any).reasoning || "";
+					}
 				} else if (chunk.type === "usage" && typeof chunk.data === "object") {
 					usage = chunk.data as UsageData;
 				} else if (chunk.type === "tool_code" && typeof chunk.data === "object") {
@@ -1341,11 +1353,33 @@ export class GeminiApiClient {
 						}
 					});
 				}
-				// Skip reasoning chunks for non-streaming responses
+			}
+
+			// Clean any inline <think> tags from content in non-streaming mode
+			if (content.includes("<think>")) {
+				const thinkMatches = Array.from(content.matchAll(/<think>([\s\S]*?)<\/think>/g));
+				if (thinkMatches.length > 0 && !reasoning) {
+					reasoning = thinkMatches.map((m) => m[1].trim()).join("\n\n");
+				}
+				content = content.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+			}
+
+			// Also clean any unclosed <think> or leftover tags
+			if (content.includes("<think>")) {
+				const parts = content.split("<think>");
+				content = parts[0].trim();
+				if (!reasoning && parts[1]) {
+					reasoning = parts[1].replace(/<\/think>/g, "").trim();
+				}
+			}
+
+			if (reasoning) {
+				reasoning = reasoning.replace(/<\/?think>/g, "").trim();
 			}
 
 			return {
 				content,
+				reasoning: reasoning || undefined,
 				usage,
 				tool_calls: tool_calls.length > 0 ? tool_calls : undefined
 			};

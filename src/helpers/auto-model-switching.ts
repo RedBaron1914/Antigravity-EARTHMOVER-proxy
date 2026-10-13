@@ -104,6 +104,10 @@ export class AutoModelSwitchingHelper {
 			}
 		}
 
+		if (content.includes("<think>")) {
+			content = content.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
+		}
+
 		return { content, usage };
 	}
 }

@@ -109,11 +109,13 @@ export function createOpenAIStreamTransformer(model: string): TransformStream<St
 				case "real_thinking":
 					if (typeof chunk.data === "string") {
 						delta.reasoning = chunk.data;
+						delta.reasoning_content = chunk.data;
 					}
 					break;
 				case "reasoning":
 					if (isReasoningData(chunk.data)) {
 						delta.reasoning = chunk.data.reasoning;
+						delta.reasoning_content = chunk.data.reasoning;
 					}
 					break;
 				case "tool_code":
