@@ -11,9 +11,9 @@ import {
 	EffortLevel
 } from "./types";
 import { AuthManager } from "./auth";
-import { CODE_ASSIST_ENDPOINT, CODE_ASSIST_API_VERSION } from "./config";
+import { ANTIGRAVITY_USER_AGENT, CODE_ASSIST_ENDPOINT, CODE_ASSIST_API_VERSION } from "./config";
 import { REASONING_MESSAGES, REASONING_CHUNK_DELAY, THINKING_CONTENT_CHUNK_SIZE } from "./constants";
-import { geminiCliModels } from "./models";
+import { geminiCliModels, resolveModel, DynamicModelEntry } from "./models";
 import { validateContent } from "./utils/validation";
 import { GenerationConfigValidator } from "./helpers/generation-config-validator";
 import { AutoModelSwitchingHelper } from "./helpers/auto-model-switching";
@@ -112,7 +112,7 @@ export class GeminiApiClient {
 	private authManager: AuthManager;
 	private projectId: string | null = null;
 	private autoSwitchHelper: AutoModelSwitchingHelper;
-	private dynamicModelMap: Record<string, any> | null = null;
+	private dynamicModelMap: Record<string, DynamicModelEntry> | null = null;
 
 	constructor(env: Env, authManager: AuthManager) {
 		this.env = env;
@@ -120,7 +120,7 @@ export class GeminiApiClient {
 		this.autoSwitchHelper = new AutoModelSwitchingHelper(env);
 	}
 
-	public async fetchDynamicModels() {
+	public async fetchDynamicModels(projectId?: string) {
 		if (this.dynamicModelMap) return;
 		console.log("[DynamicModels] Attempting to fetch available models from Antigravity...");
 		try {
@@ -128,10 +128,11 @@ export class GeminiApiClient {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					"Accept-Encoding": "gzip",
 					"Authorization": `Bearer ${this.authManager.getAccessToken()}`,
-					"User-Agent": "antigravity/cli/1.0.2 windows/amd64"
+					"User-Agent": ANTIGRAVITY_USER_AGENT
 				},
-				body: "{}"
+				body: JSON.stringify(projectId ? { project: projectId } : {})
 			});
 			if (response.ok) {
 				const data = await response.json() as any;
@@ -146,7 +147,7 @@ export class GeminiApiClient {
 		}
 	}
 
-	public getDynamicModels(): Record<string, any> | null {
+	public getDynamicModels(): Record<string, DynamicModelEntry> | null {
 		return this.dynamicModelMap;
 	}
 
@@ -537,8 +538,15 @@ export class GeminiApiClient {
 		} & NativeToolsRequestParams
 	): AsyncGenerator<StreamChunk> {
 		await this.authManager.initializeAuth(modelId);
-		await this.fetchDynamicModels();
 		const projectId = await this.discoverProjectId();
+		await this.fetchDynamicModels(projectId);
+
+		// Resolve model dynamically (or pass-through raw ID if not in catalog)
+		const resolved = resolveModel(modelId, this.dynamicModelMap);
+		const finalModelId = resolved?.id || modelId;
+		const finalModelEnum = resolved?.modelEnum || "MODEL_PLACEHOLDER_M0";
+		const dynamicThinkingBudget = resolved?.thinkingBudget;
+		const customThinkingBudget = dynamicThinkingBudget ?? 1000;
 
 		// Preprocess messages to handle parallel tool calls
 		const preprocessedMessages = this.preprocessMessages(messages);
@@ -557,7 +565,7 @@ export class GeminiApiClient {
 		}
 
 		// Check if this is a thinking model and which thinking mode to use
-		const isThinkingModel = geminiCliModels[modelId]?.thinking || false;
+		const isThinkingModel = geminiCliModels[finalModelId]?.thinking ?? true;
 		const isRealThinkingEnabled = this.env.ENABLE_REAL_THINKING === "true";
 		const isFakeThinkingEnabled = this.env.ENABLE_FAKE_THINKING === "true";
 		const streamThinkingAsContent = this.env.STREAM_THINKING_AS_CONTENT === "true";
@@ -566,16 +574,17 @@ export class GeminiApiClient {
 
 		// Use the validation helper to create a proper generation config
 		const generationConfig = GenerationConfigValidator.createValidatedConfig(
-			modelId,
+			finalModelId,
 			options,
 			isRealThinkingEnabled,
-			includeReasoning
+			includeReasoning,
+			dynamicThinkingBudget
 		);
 
 		// Native tools integration
 		const nativeToolsManager = new NativeToolsManager(this.env);
 		const nativeToolsParams = this.extractNativeToolsParams(options as Record<string, unknown>);
-		const toolConfig = nativeToolsManager.determineToolConfiguration(options?.tools || [], nativeToolsParams, modelId);
+		const toolConfig = nativeToolsManager.determineToolConfiguration(options?.tools || [], nativeToolsParams, finalModelId);
 
 		// Configure request based on tool strategy
 		const { tools, toolConfig: finalToolConfig } = GenerationConfigValidator.createFinalToolConfiguration(
@@ -590,68 +599,29 @@ export class GeminiApiClient {
 			needsThinkingClose = streamThinkingAsContent; // Only need to close if we streamed as content
 		}
 
-		let finalModelEnum = "MODEL_PLACEHOLDER_M0";
-		let customThinkingBudget = 1000;
-		let finalModelId = modelId;
+		const maxTokens =
+			resolved?.maxOutputTokens ||
+			(/gemini-[3-9]|gemini-\d{2,}|claude/i.test(finalModelId) ? 65536 : 16384);
 
-		if (this.dynamicModelMap) {
-			const dModel = this.dynamicModelMap[modelId];
-			if (dModel) {
-				if (dModel.model) finalModelEnum = dModel.model;
-				if (dModel.thinkingBudget) customThinkingBudget = dModel.thinkingBudget;
+		const finalGenerationConfig: Record<string, unknown> = {
+			...(generationConfig as Record<string, unknown>),
+			maxOutputTokens: maxTokens
+		};
+
+		if (!finalGenerationConfig.thinkingConfig) {
+			if (GenerationConfigValidator.usesThinkingLevel(finalModelId)) {
+				const level = customThinkingBudget <= 4096 ? "low" : "high";
+				finalGenerationConfig.thinkingConfig = {
+					thinkingLevel: level,
+					includeThoughts: includeReasoning
+				};
 			} else {
-				for (const [key, value] of Object.entries(this.dynamicModelMap)) {
-					if ((value as any).displayName === modelId) {
-						finalModelId = key;
-						if ((value as any).model) finalModelEnum = (value as any).model;
-						if ((value as any).thinkingBudget) customThinkingBudget = (value as any).thinkingBudget;
-						// Skip deprecated models like M37 and keep looking for the active one (M16)
-						if (finalModelEnum !== "MODEL_PLACEHOLDER_M37") {
-							break;
-						}
-					}
-				}
-			}
-		} else {
-			// Hardcoded fallbacks based on recent Antigravity 2.0 reverse engineering
-			// Match both internal keys and IDE displayNames
-			if (modelId === "claude-opus-4-6-thinking" || modelId === "Claude Opus 4.6 (Thinking)") {
-				finalModelId = "claude-opus-4-6-thinking";
-				finalModelEnum = "MODEL_PLACEHOLDER_M26";
-				customThinkingBudget = 1024;
-			} else if (modelId === "claude-sonnet-4-6-thinking" || modelId === "Claude Sonnet 4.6 (Thinking)") {
-				finalModelId = "claude-sonnet-4-6-thinking";
-				finalModelEnum = "MODEL_PLACEHOLDER_M35";
-				customThinkingBudget = 1024;
-			} else if (modelId === "gemini-3.5-flash-extra-low" || modelId === "Gemini 3.5 Flash (Low)") {
-				finalModelId = "gemini-3.5-flash-extra-low";
-				finalModelEnum = "MODEL_PLACEHOLDER_M187";
-				customThinkingBudget = 4000; // Matches dump budget for Low
-			} else if (modelId === "gemini-3.5-flash-medium" || modelId === "Gemini 3.5 Flash (Medium)") {
-				finalModelId = "gemini-3.5-flash-low"; // Key from dynamic dump
-				finalModelEnum = "MODEL_PLACEHOLDER_M20";
-				customThinkingBudget = 4000;
-			} else if (modelId === "gemini-3.5-flash-high" || modelId === "Gemini 3.5 Flash (High)") {
-				finalModelId = "gemini-3-flash-agent";
-				finalModelEnum = "MODEL_PLACEHOLDER_M132";
-				customThinkingBudget = 10000;
-			} else if (modelId === "gpt-oss-120b-medium" || modelId === "GPT-OSS 120B (Medium)") {
-				finalModelId = "gpt-oss-120b-medium";
-				finalModelEnum = "MODEL_OPENAI_GPT_OSS_120B_MEDIUM";
-				customThinkingBudget = 8192;
+				finalGenerationConfig.thinkingConfig = {
+					thinkingBudget: customThinkingBudget,
+					includeThoughts: includeReasoning
+				};
 			}
 		}
-
-		const isNewModel = finalModelId.includes("3.6") || finalModelId.includes("3.7") || finalModelEnum === "MODEL_PLACEHOLDER_M73";
-		const maxTokens = isNewModel ? 65536 : 16384;
-
-		const finalGenerationConfig = {
-			maxOutputTokens: maxTokens,
-			thinkingConfig: {
-				includeThoughts: true,
-				thinkingBudget: customThinkingBudget
-			}
-		};
 
 		const conversationId = crypto.randomUUID();
 		const trajectoryId = crypto.randomUUID();
@@ -893,7 +863,7 @@ export class GeminiApiClient {
 			headers: {
 				"Content-Type": "application/json",
 				"Authorization": `Bearer ${this.authManager.getAccessToken()}`,
-				"User-Agent": "antigravity/cli/1.0.2 windows/amd64"
+				"User-Agent": ANTIGRAVITY_USER_AGENT
 			},
 			body: JSON.stringify(streamRequest)
 		});

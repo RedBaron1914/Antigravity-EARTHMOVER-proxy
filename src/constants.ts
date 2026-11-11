@@ -29,7 +29,15 @@ export const DEFAULT_TEMPERATURE = 0.7;
 // Auto model switching configuration
 export const AUTO_SWITCH_MODEL_MAP = {
 	"gemini-2.5-pro": "gemini-2.5-flash",
-	"gemini-3-pro-preview": "gemini-3-flash-preview"
+	"gemini-3-pro-preview": "gemini-3-flash-preview",
+	"gemini-3.1-pro-high": "gemini-3.1-pro-low",
+	"gemini-3.1-pro-low": "gemini-3.8-flash-tiered",
+	"gemini-3.8-flash-tiered": "gemini-3.6-flash-tiered",
+	"gemini-3.6-flash-high": "gemini-3.6-flash-medium",
+	"gemini-3.6-flash-medium": "gemini-3.6-flash-low",
+	"gemini-3.6-flash-low": "gemini-3.6-flash-tiered",
+	"gemini-3.5-flash-high": "gemini-3.5-flash-medium",
+	"gemini-3.5-flash-medium": "gemini-3.5-flash-extra-low"
 } as const;
 
 // HTTP status codes for rate limiting

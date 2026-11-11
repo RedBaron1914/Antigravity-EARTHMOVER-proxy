@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { Env } from "../types";
 import { AuthManager } from "../auth";
-import { CODE_ASSIST_ENDPOINT, CODE_ASSIST_API_VERSION } from "../config";
+import { ANTIGRAVITY_USER_AGENT, CODE_ASSIST_ENDPOINT, CODE_ASSIST_API_VERSION } from "../config";
 import { GeminiApiClient } from "../gemini-client";
 
 export const SdapiRoute = new Hono<{ Bindings: Env }>();
@@ -83,7 +83,7 @@ SdapiRoute.post("/v1/txt2img", async (c) => {
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${authManager.getAccessToken()}`,
-				"User-Agent": "antigravity/cli/1.0.2 windows/amd64"
+				"User-Agent": ANTIGRAVITY_USER_AGENT
 			},
 			body: JSON.stringify(payload)
 		});

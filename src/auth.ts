@@ -1,5 +1,6 @@
 import { Env, OAuth2Credentials, AccountData } from "./types";
 import {
+	ANTIGRAVITY_USER_AGENT,
 	CODE_ASSIST_ENDPOINT,
 	CODE_ASSIST_API_VERSION,
 	OAUTH_CLIENT_ID,
@@ -288,7 +289,7 @@ export class AuthManager {
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `Bearer ${this.currentAccessToken}`,
-				"User-Agent": "antigravity/cli/1.0.2 windows/amd64"
+				"User-Agent": ANTIGRAVITY_USER_AGENT
 			},
 			body: JSON.stringify(body)
 		});

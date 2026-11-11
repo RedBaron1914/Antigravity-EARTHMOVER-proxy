@@ -163,9 +163,147 @@ export const geminiCliModels: Record<string, ModelInfo> = {
 // --- Default Model ---
 export const DEFAULT_MODEL = "gemini-2.5-flash";
 
+// --- Dynamic Model Discovery & Normalization ---
+
+export interface DynamicModelEntry {
+	model?: string;
+	displayName?: string;
+	thinkingBudget?: number;
+	maxOutputTokens?: number;
+	isInternal?: boolean;
+	[key: string]: unknown;
+}
+
+export interface ResolvedModel {
+	id: string;
+	modelEnum?: string;
+	thinkingBudget?: number;
+	maxOutputTokens?: number;
+	dynamic?: DynamicModelEntry;
+}
+
+/**
+ * Normalizes any model identifier (display name or id) so variants like
+ * "Gemini 3.8 Flash (Tiered)" and "gemini-3.8-flash-tiered" compare equal.
+ */
+export function normalizeModelId(modelId: string): string {
+	return modelId
+		.trim()
+		.toLowerCase()
+		.replace(/[()]/g, "")
+		.replace(/[\s_]+/g, "-")
+		.replace(/\./g, "")
+		.replace(/[^a-z0-9\-]/g, "")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+/**
+ * Resolves a requested model ID against the live dynamic catalog first,
+ * falling back to the static table only when dynamic discovery fails or
+ * doesn't contain the entry.
+ */
+export function resolveModel(
+	requestedId: string,
+	dynamicMap: Record<string, DynamicModelEntry> | null
+): ResolvedModel | null {
+	if (!requestedId) return null;
+
+	if (dynamicMap) {
+		// 1. Exact dynamic key match
+		const exact = dynamicMap[requestedId];
+		if (exact) {
+			return {
+				id: requestedId,
+				modelEnum: exact.model,
+				thinkingBudget: exact.thinkingBudget,
+				maxOutputTokens: exact.maxOutputTokens,
+				dynamic: exact
+			};
+		}
+
+		// 2. Normalized dynamic key or displayName match (skipping deprecated M37 if better exists)
+		const normalizedRequest = normalizeModelId(requestedId);
+		let deprecatedMatch: ResolvedModel | null = null;
+		for (const [key, entry] of Object.entries(dynamicMap)) {
+			const normalizedKey = normalizeModelId(key);
+			const normalizedDisplay = normalizeModelId(entry.displayName || "");
+			if (normalizedKey === normalizedRequest || normalizedDisplay === normalizedRequest) {
+				const resolved: ResolvedModel = {
+					id: key,
+					modelEnum: entry.model,
+					thinkingBudget: entry.thinkingBudget,
+					maxOutputTokens: entry.maxOutputTokens,
+					dynamic: entry
+				};
+				if (entry.model === "MODEL_PLACEHOLDER_M37") {
+					deprecatedMatch = deprecatedMatch || resolved;
+					continue;
+				}
+				return resolved;
+			}
+		}
+		if (deprecatedMatch) return deprecatedMatch;
+	}
+
+	// 3. Static table fallback (exact or normalized)
+	if (geminiCliModels[requestedId]) {
+		return { id: requestedId };
+	}
+
+	const normalizedRequest = normalizeModelId(requestedId);
+	for (const staticId of Object.keys(geminiCliModels)) {
+		if (normalizeModelId(staticId) === normalizedRequest) {
+			return { id: staticId };
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Returns raw upstream model keys from dynamic discovery (sorted), filtering out
+ * internal models by default as well as tab-completion, chat_ and image entries.
+ */
+export function buildExposedModelIds(
+	dynamicMap: Record<string, DynamicModelEntry> | null,
+	includeInternal: boolean = false
+): string[] {
+	const ids = new Set<string>();
+
+	if (dynamicMap && Object.keys(dynamicMap).length > 0) {
+		for (const [key, entry] of Object.entries(dynamicMap)) {
+			if (
+				(!includeInternal && entry.isInternal === true) ||
+				key.startsWith("chat_") ||
+				key.startsWith("tab_") ||
+				key.includes("image") ||
+				(entry.displayName && entry.displayName.toLowerCase().includes("image"))
+			) {
+				continue;
+			}
+
+			ids.add(key);
+		}
+	} else {
+		for (const id of Object.keys(geminiCliModels)) {
+			ids.add(id);
+		}
+	}
+
+	return Array.from(ids).sort();
+}
+
 // --- Helper Functions ---
 export function getModelInfo(modelId: string): ModelInfo | null {
-	return geminiCliModels[modelId] || null;
+	if (geminiCliModels[modelId]) return geminiCliModels[modelId];
+	const normalized = normalizeModelId(modelId);
+	for (const [id, info] of Object.entries(geminiCliModels)) {
+		if (normalizeModelId(id) === normalized) {
+			return info;
+		}
+	}
+	return null;
 }
 
 export function getAllModelIds(): string[] {
@@ -173,5 +311,7 @@ export function getAllModelIds(): string[] {
 }
 
 export function isValidModel(modelId: string): boolean {
-	return modelId in geminiCliModels;
+	if (modelId in geminiCliModels) return true;
+	const normalized = normalizeModelId(modelId);
+	return Object.keys(geminiCliModels).some((id) => normalizeModelId(id) === normalized);
 }
