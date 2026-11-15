@@ -1,7 +1,7 @@
 // --- Google Code Assist API Constants ---
 export const CODE_ASSIST_ENDPOINT = "https://daily-cloudcode-pa.googleapis.com";
 export const CODE_ASSIST_API_VERSION = "v1internal";
-export const ANTIGRAVITY_USER_AGENT = "antigravity/cli/1.5.5 windows/amd64";
+export const ANTIGRAVITY_USER_AGENT = "antigravity/cli/1.5.8 (aidev_client; os_type=windows; arch=amd64; cl=1020628950; auth_method=consumer)";
 
 // --- OAuth2 Configuration ---
 export const OAUTH_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";

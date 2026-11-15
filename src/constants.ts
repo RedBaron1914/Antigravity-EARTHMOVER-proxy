@@ -54,6 +54,10 @@ export const REASONING_EFFORT_BUDGETS = {
 	high: {
 		flash: 24576,
 		default: 32768
+	},
+	xhigh: {
+		flash: 32768,
+		default: 65536
 	}
 } as const;
 

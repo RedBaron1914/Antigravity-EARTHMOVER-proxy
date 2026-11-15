@@ -126,7 +126,7 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 		});
 
 		// Handle commands from system prompt (gives users control in limited UIs)
-		const effortRegex = /reasoning_effort=(low|medium|high|none)\s*/i;
+		const effortRegex = /reasoning_effort=(low|medium|high|xhigh|extra-high|extra_high|none)\s*/i;
 		const showRegex = /show_reasoning=(true|false)\s*/i;
 		const cleanRegex = /clean_context=(true|false)\s*/i;
 		
@@ -139,7 +139,8 @@ OpenAIRoute.post("/chat/completions", async (c) => {
 		let cleanContext = true; // Default to cleaning the context
 
 		if (promptEffortMatch) {
-			effortFromPrompt = promptEffortMatch[1].toLowerCase();
+			const rawEffort = promptEffortMatch[1].toLowerCase();
+			effortFromPrompt = rawEffort === "extra-high" || rawEffort === "extra_high" ? "xhigh" : rawEffort;
 			fullSystemPrompt = fullSystemPrompt.replace(effortRegex, "").trim();
 			console.log(`Reasoning effort '${effortFromPrompt}' detected in system prompt.`);
 		}

@@ -33,6 +33,8 @@ export class GenerationConfigValidator {
 				return isFlashModel ? REASONING_EFFORT_BUDGETS.medium.flash : REASONING_EFFORT_BUDGETS.medium.default;
 			case "high":
 				return isFlashModel ? REASONING_EFFORT_BUDGETS.high.flash : REASONING_EFFORT_BUDGETS.high.default;
+			case "xhigh":
+				return isFlashModel ? REASONING_EFFORT_BUDGETS.xhigh.flash : REASONING_EFFORT_BUDGETS.xhigh.default;
 			default:
 				return DEFAULT_THINKING_BUDGET;
 		}
@@ -44,7 +46,7 @@ export class GenerationConfigValidator {
 	 * @returns True if the value is a valid EffortLevel
 	 */
 	static isValidEffortLevel(value: unknown): value is EffortLevel {
-		return typeof value === "string" && ["none", "low", "medium", "high"].includes(value);
+		return typeof value === "string" && ["none", "low", "medium", "high", "xhigh"].includes(value);
 	}
 
 	/**
@@ -188,7 +190,14 @@ export class GenerationConfigValidator {
 
 			if (explicitEffort && this.isValidEffortLevel(explicitEffort)) {
 				if (this.usesThinkingLevel(modelId)) {
-					const level = explicitEffort === "low" || explicitEffort === "none" ? "low" : "high";
+					const level =
+						explicitEffort === "low" || explicitEffort === "none"
+							? "LOW"
+							: explicitEffort === "medium"
+								? "MEDIUM"
+								: explicitEffort === "xhigh"
+									? "XHIGH"
+									: "HIGH";
 					generationConfig.thinkingConfig = {
 						thinkingLevel: level,
 						includeThoughts: true
@@ -205,7 +214,8 @@ export class GenerationConfigValidator {
 				}
 			} else if (dynamicThinkingBudget !== undefined) {
 				if (this.usesThinkingLevel(modelId)) {
-					const level = dynamicThinkingBudget <= 4096 ? "low" : "high";
+					const level =
+						dynamicThinkingBudget <= 4096 ? "LOW" : dynamicThinkingBudget <= 8192 ? "MEDIUM" : "HIGH";
 					generationConfig.thinkingConfig = {
 						thinkingLevel: level,
 						includeThoughts: true
@@ -221,10 +231,10 @@ export class GenerationConfigValidator {
 				}
 			} else if (this.usesThinkingLevel(modelId)) {
 				generationConfig.thinkingConfig = {
-					thinkingLevel: "high",
+					thinkingLevel: "HIGH",
 					includeThoughts: true
 				};
-				console.log(`[GenerationConfig] Default thinkingLevel 'high' for '${modelId}'`);
+				console.log(`[GenerationConfig] Default thinkingLevel 'HIGH' for '${modelId}'`);
 			} else {
 				const thinkingBudget = this.mapEffortToThinkingBudget("high", modelId);
 				const validatedBudget = this.validateThinkingBudget(modelId, thinkingBudget);

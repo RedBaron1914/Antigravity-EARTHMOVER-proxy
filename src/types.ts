@@ -77,7 +77,7 @@ export interface ModelInfo {
 }
 
 // --- Chat Completion Request Interface ---
-export type EffortLevel = "none" | "low" | "medium" | "high";
+export type EffortLevel = "none" | "low" | "medium" | "high" | "xhigh";
 
 export interface Tool {
 	type: "function";

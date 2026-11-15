@@ -185,45 +185,22 @@ export class GeminiApiClient {
 		}
 	}
 
-	private sendFakeTelemetry(traceId: string, projectId: string, firstMessageLatency: number, totalLatency: number, includedCode: boolean = false, citationCount: number = 0): void {
+	/**
+	 * Registers ACL for the trajectory before streaming, matching official Antigravity CLI flow.
+	 */
+	public async writeTrajectoryAcls(trajectoryId: string): Promise<void> {
 		try {
-			const payload = {
-				project: projectId,
-				metadata: {
-					ideType: "GEMINI_CLI",
-					pluginType: "GEMINI",
-					duetProject: projectId
-				},
-				metrics: [
-					{
-						conversationOffered: {
-							citationCount: String(citationCount),
-							includedCode: includedCode,
-							status: 1, // ACTION_STATUS_NO_ERROR
-							traceId: traceId,
-							streamingLatency: {
-								firstMessageLatency: `${(firstMessageLatency / 1000).toFixed(3)}s`,
-								totalLatency: `${(totalLatency / 1000).toFixed(3)}s`
-							},
-							isAgentic: true,
-							initiationMethod: 2 // COMMAND
-						},
-						timestamp: new Date().toISOString()
-					}
-				]
-			};
-
-			// Fire and forget, don't await
-			fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:recordCodeAssistMetrics`, {
+			await fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:writeTrajectoryAcls`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `Bearer ${this.authManager.getAccessToken()}`
+					"Authorization": `Bearer ${this.authManager.getAccessToken()}`,
+					"User-Agent": ANTIGRAVITY_USER_AGENT
 				},
-				body: JSON.stringify(payload)
-			}).catch(() => { /* Silent fail */ });
-		} catch (e) {
-			// Silent fail
+				body: JSON.stringify({ trajectoryId })
+			});
+		} catch (error: unknown) {
+			console.warn("[TrajectoryAcls] Failed to register trajectory ACL:", error);
 		}
 	}
 
@@ -610,7 +587,8 @@ export class GeminiApiClient {
 
 		if (!finalGenerationConfig.thinkingConfig) {
 			if (GenerationConfigValidator.usesThinkingLevel(finalModelId)) {
-				const level = customThinkingBudget <= 4096 ? "low" : "high";
+				const level =
+					customThinkingBudget <= 4096 ? "LOW" : customThinkingBudget <= 8192 ? "MEDIUM" : "HIGH";
 				finalGenerationConfig.thinkingConfig = {
 					thinkingLevel: level,
 					includeThoughts: includeReasoning
@@ -623,8 +601,11 @@ export class GeminiApiClient {
 			}
 		}
 
-		const conversationId = crypto.randomUUID();
+		const cascadeId = crypto.randomUUID();
 		const trajectoryId = crypto.randomUUID();
+		const signedSessionId = String(
+			(Math.floor(Math.random() * 9000000000000000) + 1000000000000000) * (Math.random() < 0.5 ? -1 : 1)
+		);
 
 		const streamRequest: {
 			model: string;
@@ -645,21 +626,23 @@ export class GeminiApiClient {
 		} = {
 			model: finalModelId,
 			userAgent: "antigravity",
-			requestId: `agent/${conversationId}/${Date.now()}/${trajectoryId}/2`,
+			requestId: `agent/${cascadeId}/${Date.now()}/${trajectoryId}/1`,
 			requestType: "agent",
 			request: {
 				contents: contents,
 				generationConfig: finalGenerationConfig,
 				labels: {
-					"last_step_index": "1",
-					"model_enum": finalModelEnum,
-					"request_id": `${trajectoryId}-0`,
+					"cascade_id": cascadeId,
+					"root_cascade_id": cascadeId,
 					"trajectory_id": trajectoryId,
+					"request_id": `${trajectoryId}-0`,
+					"last_step_index": "0",
+					"model_enum": finalModelEnum,
 					"used_claude": finalModelId.includes("claude") ? "true" : "false",
 					"used_claude_conservative": "false",
 					"used_non_gemini_model": "false"
 				},
-				sessionId: String(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+				sessionId: signedSessionId
 			}
 		};
 
@@ -721,9 +704,9 @@ export class GeminiApiClient {
 		if (projectId) {
 			streamRequest.project = projectId;
 		} else {
-			// Force the default shadow project if missing, because Pro models with projectRestrictions 
+			// Force the default shadow project if missing, because models with projectRestrictions 
 			// will silently close the 200 OK stream if the project is omitted.
-			streamRequest.project = "carbon-reporter-5sf6z";
+			streamRequest.project = "aicode-consumers";
 		}
 
 		if (systemPrompt) {
@@ -737,6 +720,9 @@ export class GeminiApiClient {
 		if (safetySettings.length > 0) {
 			streamRequest.request.safetySettings = safetySettings;
 		}
+
+		// Register trajectory ACL before streaming content, matching official Antigravity protocol
+		await this.writeTrajectoryAcls(trajectoryId);
 
 		yield* this.performStreamRequest(
 			streamRequest,
